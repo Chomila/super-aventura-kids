@@ -1,0 +1,1147 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Super Jump Heroes</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fredoka+One:wght@400&family=Comic+Neue:wght@400;700&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Comic Neue', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+        
+        .game-container {
+            width: 100%;
+            max-width: 900px;
+            height: 500px;
+            position: relative;
+            border: 5px solid #fff;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+            overflow: hidden;
+            background: linear-gradient(to bottom, #87CEEB 0%, #98FB98 100%);
+        }
+        
+        .title {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-family: 'Fredoka One', cursive;
+            font-size: 2rem;
+            color: #fff;
+            text-shadow: 3px 3px 0px #ff6b6b, 6px 6px 10px rgba(0,0,0,0.3);
+            z-index: 100;
+            animation: pulse 2s ease-in-out infinite alternate;
+        }
+        
+        @keyframes pulse {
+            from { transform: translateX(-50%) scale(1); }
+            to { transform: translateX(-50%) scale(1.05); }
+        }
+        
+        /* Character Selection Screen */
+        .character-selection {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(45deg, #ff9a9e, #fecfef);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 50;
+        }
+        
+        .character-selection h2 {
+            font-family: 'Fredoka One', cursive;
+            font-size: 2.5rem;
+            color: #333;
+            margin-bottom: 30px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .characters-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 30px;
+            margin-bottom: 20px;
+        }
+        
+        .character-card {
+            width: 120px;
+            height: 180px;
+            background: rgba(255,255,255,0.9);
+            border-radius: 20px;
+            border: 3px solid #fff;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+            position: relative;
+        }
+        
+        .character-card:hover {
+            transform: translateY(-10px) scale(1.1);
+            box-shadow: 0 15px 30px rgba(0,0,0,0.3);
+            border-color: #ff6b6b;
+        }
+        
+        .character-emoji {
+            font-size: 4rem;
+            margin-bottom: 10px;
+        }
+        
+        .character-name {
+            font-weight: bold;
+            color: #333;
+            text-align: center;
+            font-size: 14px;
+            margin-bottom: 5px;
+        }
+        
+        .character-power {
+            font-size: 10px;
+            color: #666;
+            text-align: center;
+            padding: 0 5px;
+        }
+        
+        /* Scenario Selection Screen */
+        .scenario-selection {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(45deg, #4ecdc4, #44a08d);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 45;
+        }
+        
+        .scenario-selection h2 {
+            font-family: 'Fredoka One', cursive;
+            font-size: 2.5rem;
+            color: #fff;
+            margin-bottom: 30px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .scenarios-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .scenario-card {
+            width: 140px;
+            height: 160px;
+            background: rgba(255,255,255,0.9);
+            border-radius: 20px;
+            border: 3px solid #fff;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+            position: relative;
+        }
+        
+        .scenario-card:hover {
+            transform: translateY(-10px) scale(1.05);
+            box-shadow: 0 15px 30px rgba(0,0,0,0.3);
+            border-color: #4ecdc4;
+        }
+        
+        .scenario-preview {
+            width: 100px;
+            height: 60px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+        }
+        
+        .scenario-name {
+            font-weight: bold;
+            color: #333;
+            text-align: center;
+            font-size: 16px;
+            margin-bottom: 5px;
+        }
+        
+        .scenario-obstacles {
+            font-size: 12px;
+            color: #666;
+            text-align: center;
+            padding: 0 5px;
+        }
+        
+        /* Game Canvas */
+        .game-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(to bottom, #87CEEB 0%, #98FB98 100%);
+        }
+        
+        .game-canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+        
+        /* HUD */
+        .hud {
+            position: absolute;
+            top: 50px;
+            left: 20px;
+            right: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 10;
+            pointer-events: none;
+        }
+        
+        .hud-item {
+            background: rgba(255,255,255,0.9);
+            padding: 10px 15px;
+            border-radius: 10px;
+            font-weight: bold;
+            color: #333;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        
+        .pause-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 50px;
+            height: 50px;
+            background: rgba(255,255,255,0.9);
+            border: none;
+            border-radius: 50%;
+            font-size: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            z-index: 20;
+            pointer-events: auto;
+        }
+        
+        .pause-btn:hover {
+            transform: scale(1.1);
+            background: #fff;
+        }
+        
+        /* Game Over Screen */
+        .game-over {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 30;
+        }
+        
+        .game-over h2 {
+            font-family: 'Fredoka One', cursive;
+            font-size: 3rem;
+            color: #fff;
+            margin-bottom: 20px;
+            text-shadow: 3px 3px 6px rgba(0,0,0,0.5);
+        }
+        
+        .final-score {
+            font-size: 1.5rem;
+            color: #fff;
+            margin-bottom: 30px;
+        }
+        
+        .restart-btn {
+            background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
+            color: #fff;
+            border: none;
+            padding: 15px 30px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            border-radius: 15px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+        
+        .restart-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+        }
+        
+        /* Pause Screen */
+        .pause-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 25;
+        }
+        
+        .pause-screen h2 {
+            font-family: 'Fredoka One', cursive;
+            font-size: 2.5rem;
+            color: #fff;
+            margin-bottom: 30px;
+        }
+        
+        .resume-btn {
+            background: linear-gradient(45deg, #4ecdc4, #44a08d);
+            color: #fff;
+            border: none;
+            padding: 15px 30px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            border-radius: 15px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+        
+        .resume-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+        }
+        
+        .instructions {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #fff;
+            text-align: center;
+            font-size: 14px;
+            background: rgba(0,0,0,0.5);
+            padding: 10px 20px;
+            border-radius: 10px;
+        }
+        
+        @media (max-width: 768px) {
+            .game-container {
+                width: 95%;
+                height: 400px;
+            }
+            
+            .characters-grid, .scenarios-grid {
+                grid-template-columns: repeat(3, 1fr);
+                gap: 15px;
+            }
+            
+            .character-card {
+                width: 80px;
+                height: 120px;
+            }
+            
+            .scenario-card {
+                width: 90px;
+                height: 110px;
+            }
+            
+            .character-emoji {
+                font-size: 2.5rem;
+            }
+            
+            .scenario-preview {
+                width: 60px;
+                height: 40px;
+                font-size: 1.5rem;
+            }
+            
+            .title {
+                font-size: 1.5rem;
+            }
+            
+            .character-selection h2, .scenario-selection h2 {
+                font-size: 1.8rem;
+            }
+            
+            .instructions {
+                font-size: 10px;
+                padding: 5px 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1 class="title">🦸‍♂️ Super Jump Heroes 🐸</h1>
+        
+        <!-- Character Selection Screen -->
+        <div class="character-selection" id="characterSelection">
+            <h2>¡Elige tu Héroe!</h2>
+            <div class="characters-grid">
+                <div class="character-card" data-character="batman">
+                    <div class="character-emoji">🦇</div>
+                    <div class="character-name">Batman</div>
+                    <div class="character-power">Poder: Vuelo<br>Salto: Potente</div>
+                </div>
+                <div class="character-card" data-character="chomila">
+                    <div class="character-emoji">🐸</div>
+                    <div class="character-name">Chomila</div>
+                    <div class="character-power">Niña rana<br>Salto: Súper Alto</div>
+                </div>
+                <div class="character-card" data-character="wodermama">
+                    <div class="character-emoji">👩‍💼</div>
+                    <div class="character-name">WoderMamá</div>
+                    <div class="character-power">Poder: Escudo<br>Salto: Equilibrado</div>
+                </div>
+            </div>
+            <p style="color: #333; text-align: center; margin-top: 20px;">
+                Cada héroe tiene habilidades únicas de salto
+            </p>
+        </div>
+        
+        <!-- Scenario Selection Screen -->
+        <div class="scenario-selection" id="scenarioSelection">
+            <h2>¡Elige tu Aventura!</h2>
+            <div class="scenarios-grid">
+                <div class="scenario-card" data-scenario="0">
+                    <div class="scenario-preview" style="background: linear-gradient(to bottom, #87CEEB, #32CD32);">🏙️</div>
+                    <div class="scenario-name">Ciudad</div>
+                    <div class="scenario-obstacles">Evita: 🏢🚗🚧</div>
+                </div>
+                <div class="scenario-card" data-scenario="1">
+                    <div class="scenario-preview" style="background: linear-gradient(to bottom, #F4A460, #DEB887);">🏜️</div>
+                    <div class="scenario-name">Desierto</div>
+                    <div class="scenario-obstacles">Evita: 🌵🪨🦂</div>
+                </div>
+                <div class="scenario-card" data-scenario="2">
+                    <div class="scenario-preview" style="background: linear-gradient(to bottom, #228B22, #8B4513);">🌲</div>
+                    <div class="scenario-name">Bosque</div>
+                    <div class="scenario-obstacles">Evita: 🌲🪵🐻</div>
+                </div>
+                <div class="scenario-card" data-scenario="3">
+                    <div class="scenario-preview" style="background: linear-gradient(to bottom, #B0E0E6, #FFFFFF);">❄️</div>
+                    <div class="scenario-name">Nieve</div>
+                    <div class="scenario-obstacles">Evita: ❄️⛄🧊</div>
+                </div>
+                <div class="scenario-card" data-scenario="4">
+                    <div class="scenario-preview" style="background: linear-gradient(to bottom, #191970, #696969);">🚀</div>
+                    <div class="scenario-name">Espacio</div>
+                    <div class="scenario-obstacles">Evita: 🛸☄️🚀</div>
+                </div>
+                <div class="scenario-card" data-scenario="auto">
+                    <div class="scenario-preview" style="background: linear-gradient(45deg, #ff6b6b, #4ecdc4);">🎮</div>
+                    <div class="scenario-name">Automático</div>
+                    <div class="scenario-obstacles">Cambia cada nivel</div>
+                </div>
+            </div>
+            <p style="color: #fff; text-align: center; margin-top: 20px; font-weight: bold;">
+                🚨 OBSTÁCULOS te quitan vida - ¡SÁLTALOS! | ⭐ PREMIOS te dan puntos - ¡RECÓGELOS!
+            </p>
+        </div>
+        
+        <!-- Game Screen -->
+        <div class="game-screen" id="gameScreen" style="display: none;">
+            <canvas class="game-canvas" id="gameCanvas"></canvas>
+            
+            <!-- HUD -->
+            <div class="hud">
+                <div class="hud-item">
+                    <span>Puntos: </span><span id="score">0</span>
+                </div>
+                <div class="hud-item">
+                    <span>Nivel: </span><span id="level">1</span>
+                </div>
+                <div class="hud-item">
+                    <span>Vidas: </span><span id="lives">3</span>
+                </div>
+            </div>
+            
+            <!-- Pause Button -->
+            <button class="pause-btn" id="pauseBtn">⏸️</button>
+        </div>
+        
+        <!-- Pause Screen -->
+        <div class="pause-screen" id="pauseScreen">
+            <h2>⏸️ Juego Pausado</h2>
+            <button class="resume-btn" id="resumeBtn">▶️ Continuar</button>
+        </div>
+        
+        <!-- Game Over Screen -->
+        <div class="game-over" id="gameOver">
+            <h2>🎮 ¡Fin del Juego!</h2>
+            <div class="final-score">Puntuación Final: <span id="finalScore">0</span></div>
+            <button class="restart-btn" id="restartBtn">🔄 Jugar de Nuevo</button>
+        </div>
+        
+        <!-- Instructions -->
+        <div class="instructions">
+            <strong>🎮 Controles:</strong> ESPACIO o CLICK para saltar 🚀<br>
+            <strong>🚨 OBSTÁCULOS (te matan):</strong> 🏢🚗🚧🌵🪨🦂🌲🪵🐻❄️⛄🧊🛸☄️🚀<br>
+            <strong>⭐ PREMIOS (recolecta):</strong> ⭐💎🏆🎁💰 = Puntos extras
+        </div>
+    </div>
+
+    <script>
+        class SuperJumpHeroes {
+            constructor() {
+                this.canvas = document.getElementById('gameCanvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.gameRunning = false;
+                this.gamePaused = false;
+                this.selectedCharacter = null;
+                this.selectedScenario = null;
+                this.autoScenario = false;
+                
+                // Game state
+                this.score = 0;
+                this.level = 1;
+                this.lives = 3;
+                this.speed = 3;
+                this.frameCount = 0;
+                
+                // Player
+                this.player = {
+                    x: 100,
+                    y: 300,
+                    width: 40,
+                    height: 40,
+                    velocityY: 0,
+                    jumping: false,
+                    grounded: true
+                };
+                
+                // Game objects
+                this.obstacles = [];
+                this.rewards = [];
+                this.clouds = [];
+                this.particles = [];
+                
+                // Scenarios
+                this.scenarios = [
+                    { name: 'Ciudad', bg: '#87CEEB', ground: '#32CD32', obstacles: ['🏢', '🚗', '🚧'] },
+                    { name: 'Desierto', bg: '#F4A460', ground: '#DEB887', obstacles: ['🌵', '🪨', '🦂'] },
+                    { name: 'Bosque', bg: '#228B22', ground: '#8B4513', obstacles: ['🌲', '🪵', '🐻'] },
+                    { name: 'Nieve', bg: '#B0E0E6', ground: '#FFFFFF', obstacles: ['❄️', '⛄', '🧊'] },
+                    { name: 'Espacio', bg: '#191970', ground: '#696969', obstacles: ['🛸', '☄️', '🚀'] }
+                ];
+                
+                this.currentScenario = 0;
+                
+                // Characters
+                this.characters = {
+                    batman: { emoji: '🦇', name: 'Batman', jumpPower: 12, special: 'vuelo' },
+                    chomila: { emoji: '🐸', name: 'Chomila', jumpPower: 15, special: 'súper salto' },
+                    wodermama: { emoji: '👩‍💼', name: 'WoderMamá', jumpPower: 10, special: 'escudo' }
+                };
+                
+                this.initializeGame();
+            }
+            
+            initializeGame() {
+                this.setupCanvas();
+                this.setupEventListeners();
+                this.generateClouds();
+            }
+            
+            setupCanvas() {
+                this.canvas.width = 900;
+                this.canvas.height = 500;
+            }
+            
+            setupEventListeners() {
+                // Character selection
+                document.querySelectorAll('.character-card').forEach(card => {
+                    card.addEventListener('click', (e) => {
+                        this.selectCharacter(e.currentTarget.dataset.character);
+                    });
+                });
+                
+                // Scenario selection
+                document.querySelectorAll('.scenario-card').forEach(card => {
+                    card.addEventListener('click', (e) => {
+                        this.selectScenario(e.currentTarget.dataset.scenario);
+                    });
+                });
+                
+                // Game controls
+                document.addEventListener('keydown', (e) => {
+                    if (e.code === 'Space' && this.gameRunning && !this.gamePaused) {
+                        e.preventDefault();
+                        this.jump();
+                    }
+                });
+                
+                this.canvas.addEventListener('click', () => {
+                    if (this.gameRunning && !this.gamePaused) {
+                        this.jump();
+                    }
+                });
+                
+                // Pause functionality
+                document.getElementById('pauseBtn').addEventListener('click', () => {
+                    this.togglePause();
+                });
+                
+                document.getElementById('resumeBtn').addEventListener('click', () => {
+                    this.togglePause();
+                });
+                
+                // Restart
+                document.getElementById('restartBtn').addEventListener('click', () => {
+                    this.restartGame();
+                });
+            }
+            
+            selectCharacter(character) {
+                this.selectedCharacter = character;
+                document.getElementById('characterSelection').style.display = 'none';
+                document.getElementById('scenarioSelection').style.display = 'flex';
+            }
+            
+            selectScenario(scenario) {
+                if (scenario === 'auto') {
+                    this.autoScenario = true;
+                    this.selectedScenario = 0;
+                } else {
+                    this.autoScenario = false;
+                    this.selectedScenario = parseInt(scenario);
+                }
+                
+                this.currentScenario = this.selectedScenario;
+                document.getElementById('scenarioSelection').style.display = 'none';
+                document.getElementById('gameScreen').style.display = 'block';
+                this.startGame();
+            }
+            
+            startGame() {
+                this.gameRunning = true;
+                this.gamePaused = false;
+                this.score = 0;
+                this.level = 1;
+                this.lives = 3;
+                this.speed = 3;
+                this.frameCount = 0;
+                this.obstacles = [];
+                this.rewards = [];
+                this.particles = [];
+                
+                // Reset player position
+                this.player.y = 300;
+                this.player.velocityY = 0;
+                this.player.jumping = false;
+                this.player.grounded = true;
+                
+                this.updateHUD();
+                this.gameLoop();
+            }
+            
+            gameLoop() {
+                if (!this.gameRunning || this.gamePaused) return;
+                
+                this.update();
+                this.render();
+                this.frameCount++;
+                
+                requestAnimationFrame(() => this.gameLoop());
+            }
+            
+            update() {
+                // Update level and speed
+                const newLevel = Math.floor(this.score / 1000) + 1;
+                if (newLevel > this.level) {
+                    this.level = newLevel;
+                    this.speed += 0.5;
+                    
+                    // Solo cambiar escenario si está en modo automático
+                    if (this.autoScenario) {
+                        this.currentScenario = (this.level - 1) % this.scenarios.length;
+                    }
+                    
+                    this.createLevelUpEffect();
+                }
+                
+                // Update player physics
+                this.updatePlayer();
+                
+                // Spawn obstacles and rewards
+                if (this.frameCount % (120 - this.level * 5) === 0) {
+                    this.spawnObstacle();
+                }
+                
+                if (this.frameCount % 200 === 0) {
+                    this.spawnReward();
+                }
+                
+                // Update game objects
+                this.updateObstacles();
+                this.updateRewards();
+                this.updateParticles();
+                this.updateClouds();
+                
+                // Check collisions
+                this.checkCollisions();
+                
+                // Update score
+                this.score += 1;
+                this.updateHUD();
+            }
+            
+            updatePlayer() {
+                // Gravity
+                if (!this.player.grounded) {
+                    this.player.velocityY += 0.8;
+                }
+                
+                this.player.y += this.player.velocityY;
+                
+                // Ground collision - asegurarse que coincida con donde se dibujan los obstáculos
+                const groundY = 300; // Misma Y que los obstáculos
+                if (this.player.y >= groundY) {
+                    this.player.y = groundY;
+                    this.player.velocityY = 0;
+                    this.player.jumping = false;
+                    this.player.grounded = true;
+                }
+            }
+            
+            jump() {
+                if (this.player.grounded) {
+                    const character = this.characters[this.selectedCharacter];
+                    this.player.velocityY = -character.jumpPower;
+                    this.player.jumping = true;
+                    this.player.grounded = false;
+                    
+                    // Create jump particles
+                    for (let i = 0; i < 5; i++) {
+                        this.particles.push({
+                            x: this.player.x + Math.random() * this.player.width,
+                            y: this.player.y + this.player.height,
+                            vx: (Math.random() - 0.5) * 4,
+                            vy: Math.random() * -3,
+                            life: 30,
+                            maxLife: 30,
+                            color: '#ffeb3b'
+                        });
+                    }
+                }
+            }
+            
+            spawnObstacle() {
+                const scenario = this.scenarios[this.currentScenario];
+                const obstacleType = scenario.obstacles[Math.floor(Math.random() * scenario.obstacles.length)];
+                
+                this.obstacles.push({
+                    x: this.canvas.width,
+                    y: 300, // Posición en el suelo
+                    width: 35,
+                    height: 45,
+                    emoji: obstacleType,
+                    speed: this.speed
+                });
+            }
+            
+            spawnReward() {
+                const rewards = ['⭐', '💎', '🏆', '🎁', '💰'];
+                const rewardType = rewards[Math.floor(Math.random() * rewards.length)];
+                
+                this.rewards.push({
+                    x: this.canvas.width,
+                    y: 200 + Math.random() * 150,
+                    width: 25,
+                    height: 25,
+                    emoji: rewardType,
+                    speed: this.speed,
+                    value: rewardType === '💎' ? 100 : rewardType === '🏆' ? 200 : 50,
+                    bobOffset: Math.random() * Math.PI * 2
+                });
+            }
+            
+            updateObstacles() {
+                this.obstacles = this.obstacles.filter(obstacle => {
+                    obstacle.x -= obstacle.speed;
+                    return obstacle.x > -obstacle.width;
+                });
+            }
+            
+            updateRewards() {
+                this.rewards = this.rewards.filter(reward => {
+                    reward.x -= reward.speed;
+                    reward.bobOffset += 0.1;
+                    reward.y += Math.sin(reward.bobOffset) * 0.5;
+                    return reward.x > -reward.width;
+                });
+            }
+            
+            updateParticles() {
+                this.particles = this.particles.filter(particle => {
+                    particle.x += particle.vx;
+                    particle.y += particle.vy;
+                    particle.vy += 0.1;
+                    particle.life--;
+                    return particle.life > 0;
+                });
+            }
+            
+            updateClouds() {
+                this.clouds.forEach(cloud => {
+                    cloud.x -= 0.5;
+                    if (cloud.x < -cloud.width) {
+                        cloud.x = this.canvas.width;
+                    }
+                });
+            }
+            
+            checkCollisions() {
+                // Obstacle collisions - revisar cada obstáculo
+                for (let i = this.obstacles.length - 1; i >= 0; i--) {
+                    const obstacle = this.obstacles[i];
+                    if (this.isColliding(this.player, obstacle)) {
+                        this.hitObstacle(i);
+                        break; // Solo un obstáculo por frame
+                    }
+                }
+                
+                // Reward collisions - revisar cada premio
+                for (let i = this.rewards.length - 1; i >= 0; i--) {
+                    const reward = this.rewards[i];
+                    if (this.isColliding(this.player, reward)) {
+                        this.collectReward(i);
+                    }
+                }
+            }
+            
+            isColliding(rect1, rect2) {
+                // Reducir un poco las cajas de colisión para que sea más justo
+                const margin = 5;
+                return rect1.x + margin < rect2.x + rect2.width - margin &&
+                       rect1.x + rect1.width - margin > rect2.x + margin &&
+                       rect1.y + margin < rect2.y + rect2.height - margin &&
+                       rect1.y + rect1.height - margin > rect2.y + margin;
+            }
+            
+            hitObstacle(index) {
+                // Remover el obstáculo
+                this.obstacles.splice(index, 1);
+                
+                // Quitar vida
+                this.lives--;
+                
+                // Crear efecto visual de impacto
+                this.createHitEffect();
+                
+                // Hacer que el jugador "rebote" un poco
+                this.player.velocityY = -5;
+                
+                // Efecto de pantalla roja temporal
+                this.createScreenShake();
+                
+                // Actualizar HUD inmediatamente
+                this.updateHUD();
+                
+                // Verificar game over
+                if (this.lives <= 0) {
+                    setTimeout(() => {
+                        this.gameOver();
+                    }, 500);
+                }
+            }
+            
+            createScreenShake() {
+                // Efecto visual de impacto
+                this.canvas.style.filter = 'hue-rotate(0deg) brightness(150%) saturate(200%)';
+                setTimeout(() => {
+                    this.canvas.style.filter = 'hue-rotate(10deg) brightness(120%) saturate(150%)';
+                }, 50);
+                setTimeout(() => {
+                    this.canvas.style.filter = 'none';
+                }, 100);
+            }
+            
+            collectReward(index) {
+                const reward = this.rewards[index];
+                this.score += reward.value;
+                this.rewards.splice(index, 1);
+                
+                // Create collect effect
+                this.createCollectEffect(reward.x, reward.y);
+            }
+            
+            createHitEffect() {
+                // Crear muchas partículas rojas de impacto
+                for (let i = 0; i < 15; i++) {
+                    this.particles.push({
+                        x: this.player.x + this.player.width / 2,
+                        y: this.player.y + this.player.height / 2,
+                        vx: (Math.random() - 0.5) * 12,
+                        vy: (Math.random() - 0.5) * 12 - 2,
+                        life: 50,
+                        maxLife: 50,
+                        color: '#ff4444'
+                    });
+                }
+                
+                // Agregar partículas adicionales de explosión
+                for (let i = 0; i < 10; i++) {
+                    this.particles.push({
+                        x: this.player.x + this.player.width / 2,
+                        y: this.player.y + this.player.height / 2,
+                        vx: (Math.random() - 0.5) * 8,
+                        vy: Math.random() * -8,
+                        life: 30,
+                        maxLife: 30,
+                        color: '#ffaa00'
+                    });
+                }
+            }
+            
+            createCollectEffect(x, y) {
+                for (let i = 0; i < 8; i++) {
+                    this.particles.push({
+                        x: x,
+                        y: y,
+                        vx: (Math.random() - 0.5) * 6,
+                        vy: (Math.random() - 0.5) * 6,
+                        life: 30,
+                        maxLife: 30,
+                        color: '#ffd700'
+                    });
+                }
+            }
+            
+            createLevelUpEffect() {
+                for (let i = 0; i < 20; i++) {
+                    this.particles.push({
+                        x: this.canvas.width / 2,
+                        y: this.canvas.height / 2,
+                        vx: (Math.random() - 0.5) * 12,
+                        vy: (Math.random() - 0.5) * 12,
+                        life: 60,
+                        maxLife: 60,
+                        color: '#ff6b6b'
+                    });
+                }
+            }
+            
+            generateClouds() {
+                for (let i = 0; i < 5; i++) {
+                    this.clouds.push({
+                        x: Math.random() * this.canvas.width,
+                        y: 50 + Math.random() * 100,
+                        width: 60 + Math.random() * 40,
+                        height: 30 + Math.random() * 20
+                    });
+                }
+            }
+            
+            render() {
+                const scenario = this.scenarios[this.currentScenario];
+                
+                // Clear canvas
+                this.ctx.fillStyle = scenario.bg;
+                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+                
+                // Draw clouds
+                this.drawClouds();
+                
+                // Draw ground
+                this.ctx.fillStyle = scenario.ground;
+                this.ctx.fillRect(0, 340, this.canvas.width, this.canvas.height - 340);
+                
+                // Draw player
+                this.drawPlayer();
+                
+                // Draw obstacles
+                this.drawObstacles();
+                
+                // Draw rewards
+                this.drawRewards();
+                
+                // Draw particles
+                this.drawParticles();
+                
+                // Draw scenario info
+                this.ctx.fillStyle = 'rgba(255,255,255,0.9)';
+                this.ctx.font = 'bold 16px Comic Neue';
+                const scenarioText = this.autoScenario ? `${scenario.name} (Auto)` : scenario.name;
+                this.ctx.fillText(scenarioText, 20, this.canvas.height - 40);
+                
+                // Draw current obstacles for this scenario
+                this.ctx.fillStyle = 'rgba(255,255,255,0.8)';
+                this.ctx.font = '12px Comic Neue';
+                this.ctx.fillText(`Obstáculos: ${scenario.obstacles.join(' ')}`, 20, this.canvas.height - 20);
+            }
+            
+            drawPlayer() {
+                const character = this.characters[this.selectedCharacter];
+                this.ctx.font = `${this.player.width}px Arial`;
+                this.ctx.textAlign = 'center';
+                this.ctx.fillText(
+                    character.emoji,
+                    this.player.x + this.player.width / 2,
+                    this.player.y + this.player.height
+                );
+                
+                // Add animation when jumping
+                if (this.player.jumping) {
+                    this.ctx.save();
+                    this.ctx.translate(this.player.x + this.player.width / 2, this.player.y + this.player.height / 2);
+                    this.ctx.rotate(this.player.velocityY * 0.02);
+                    this.ctx.translate(-(this.player.x + this.player.width / 2), -(this.player.y + this.player.height / 2));
+                    this.ctx.fillText(
+                        character.emoji,
+                        this.player.x + this.player.width / 2,
+                        this.player.y + this.player.height
+                    );
+                    this.ctx.restore();
+                } else {
+                    this.ctx.fillText(
+                        character.emoji,
+                        this.player.x + this.player.width / 2,
+                        this.player.y + this.player.height
+                    );
+                }
+            }
+            
+            drawObstacles() {
+                this.obstacles.forEach(obstacle => {
+                    this.ctx.font = `${obstacle.height}px Arial`;
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText(
+                        obstacle.emoji,
+                        obstacle.x + obstacle.width / 2,
+                        obstacle.y + obstacle.height
+                    );
+                });
+            }
+            
+            drawRewards() {
+                this.rewards.forEach(reward => {
+                    this.ctx.font = `${reward.height}px Arial`;
+                    this.ctx.textAlign = 'center';
+                    this.ctx.fillText(
+                        reward.emoji,
+                        reward.x + reward.width / 2,
+                        reward.y + reward.height
+                    );
+                });
+            }
+            
+            drawParticles() {
+                this.particles.forEach(particle => {
+                    const alpha = particle.life / particle.maxLife;
+                    this.ctx.fillStyle = particle.color + Math.floor(alpha * 255).toString(16).padStart(2, '0');
+                    this.ctx.fillRect(particle.x, particle.y, 3, 3);
+                });
+            }
+            
+            drawClouds() {
+                this.ctx.fillStyle = 'rgba(255,255,255,0.8)';
+                this.clouds.forEach(cloud => {
+                    this.ctx.beginPath();
+                    this.ctx.arc(cloud.x, cloud.y, cloud.width/3, 0, Math.PI * 2);
+                    this.ctx.arc(cloud.x + cloud.width/3, cloud.y, cloud.width/4, 0, Math.PI * 2);
+                    this.ctx.arc(cloud.x + cloud.width/2, cloud.y, cloud.width/3, 0, Math.PI * 2);
+                    this.ctx.fill();
+                });
+            }
+            
+            togglePause() {
+                this.gamePaused = !this.gamePaused;
+                
+                if (this.gamePaused) {
+                    document.getElementById('pauseScreen').style.display = 'flex';
+                } else {
+                    document.getElementById('pauseScreen').style.display = 'none';
+                    this.gameLoop();
+                }
+            }
+            
+            updateHUD() {
+                document.getElementById('score').textContent = this.score;
+                document.getElementById('level').textContent = this.level;
+                
+                // Mostrar vidas con emojis para mejor visualización
+                const livesElement = document.getElementById('lives');
+                const heartsDisplay = '❤️'.repeat(this.lives) + '🖤'.repeat(Math.max(0, 3 - this.lives));
+                livesElement.innerHTML = `${this.lives} ${heartsDisplay}`;
+                
+                // Cambiar color del HUD de vidas si están bajas
+                const livesHUD = livesElement.parentElement;
+                if (this.lives <= 1) {
+                    livesHUD.style.backgroundColor = 'rgba(255,100,100,0.9)';
+                    livesHUD.style.color = '#fff';
+                } else {
+                    livesHUD.style.backgroundColor = 'rgba(255,255,255,0.9)';
+                    livesHUD.style.color = '#333';
+                }
+            }
+            
+            gameOver() {
+                this.gameRunning = false;
+                document.getElementById('finalScore').textContent = this.score;
+                document.getElementById('gameOver').style.display = 'flex';
+            }
+            
+            restartGame() {
+                document.getElementById('gameOver').style.display = 'none';
+                document.getElementById('gameScreen').style.display = 'none';
+                document.getElementById('scenarioSelection').style.display = 'none';
+                document.getElementById('characterSelection').style.display = 'flex';
+                
+                // Reset game state
+                this.selectedCharacter = null;
+                this.selectedScenario = null;
+                this.autoScenario = false;
+                this.obstacles = [];
+                this.rewards = [];
+                this.particles = [];
+                this.currentScenario = 0;
+            }
+        }
+        
+        // Initialize game when page loads
+        window.addEventListener('load', () => {
+            new SuperJumpHeroes();
+        });
+    </script>
+</body>
+</html>
