@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>GymMX · Registro (nuevo) y Check‑in (registrado)</title>
+<style>
+  :root{--bg:#0b0f14;--card:#121922;--muted:#8aa1b1;--ink:#e8f0f6;--accent:#2ea37f;--danger:#ff6b6b}
+  *{box-sizing:border-box}
+  body{margin:0;background:linear-gradient(180deg,#0b0f14,#0f1620);font:16px/1.4 system-ui,Segoe UI,Roboto,Arial,sans-serif;color:var(--ink)}
+  .wrap{max-width:1000px;margin:24px auto;padding:16px}
+  .card{background:#111926cc;border:1px solid #1d2632;border-radius:18px;box-shadow:0 10px 30px rgba(0,0,0,.35);padding:20px}
+  h1{margin:0 0 4px;font-size:clamp(22px,4vw,30px)}
+  .sub{color:var(--muted);margin-bottom:14px}
+  .tabs{display:flex;gap:8px;margin:10px 0 16px}
+  .tab{flex:1;text-align:center;padding:10px;border-radius:12px;border:1px solid #243140;background:#0f1520;color:#cfe0ec;cursor:pointer}
+  .tab.active{outline:2px solid var(--accent);border-color:#2a8f76;background:#0d1822}
+  label{display:block;margin:10px 0 6px;color:#cfe0ec}
+  input,select,textarea{width:100%;padding:12px;border-radius:12px;border:1px solid #253246;background:#0f1320;color:#e6f2ff}
+  textarea{min-height:72px;resize:vertical}
+  .grid{display:grid;gap:12px}
+  .g2{grid-template-columns:1fr 1fr}
+  .g3{grid-template-columns:1fr 1fr 1fr}
+  @media (max-width:860px){.g2,.g3{grid-template-columns:1fr}}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media (max-width:820px){.row{grid-template-columns:1fr}}
+  .btn{display:inline-flex;align-items:center;gap:8px;padding:12px 16px;border-radius:12px;border:1px solid #264b42;background:linear-gradient(180deg,#1b6b55,#175646);color:#eafff6;cursor:pointer}
+  .btn:hover{filter:brightness(1.05)}
+  .btn.ghost{background:#0f1520;border-color:#223443}
+  .hint{font-size:12px;color:#9fb3c3;margin-top:6px}
+  .note{font-size:12px;color:#9fb3c3}
+  .sep{height:1px;background:linear-gradient(90deg,transparent,#253346,transparent);margin:14px 0}
+  .result{white-space:pre-wrap;background:#0d121c;border:1px solid #1e2a3a;border-radius:16px;padding:14px;margin-top:14px;display:none}
+  .err{color:var(--danger)}
+  .debug{display:none}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>GymMX</h1>
+      <div class="sub">Elige si eres <strong>nuevo</strong> o <strong>ya registrado</strong>, llena el formulario y enviaremos tus datos a n8n.</div>
+
+      <div class="tabs" role="tablist">
+        <button class="tab active" id="tab-new" aria-selected="true">🆕 Nuevo usuario</button>
+        <button class="tab" id="tab-existing" aria-selected="false">🔐 Ya registrado</button>
+      </div>
+
+      <!-- Sección común: usuario/contraseña -->
+      <div class="row">
+        <div>
+          <label for="username">Usuario</label>
+          <input id="username" autocomplete="username" placeholder="ej. steph" />
+        </div>
+        <div>
+          <label for="password">Contraseña</label>
+          <input id="password" type="password" autocomplete="current-password" placeholder="••••••••" />
+          <div class="hint">Tu contraseña se envía por HTTPS a tu n8n. En el servidor debes hashearla/validarla.</div>
+        </div>
+      </div>
+
+      <!-- NUEVO USUARIO: perfil completo -->
+      <section id="sec-new">
+        <div class="sep"></div>
+        <div class="grid g2">
+          <div>
+            <label for="nombre">Nombre</label>
+            <input id="nombre" placeholder="Nombre" />
+          </div>
+          <div>
+            <label for="apellido">Apellido</label>
+            <input id="apellido" placeholder="Apellido" />
+          </div>
+        </div>
+        <div class="grid g3">
+          <div>
+            <label for="edad">Edad</label>
+            <input id="edad" type="number" min="10" max="100" placeholder="34" />
+          </div>
+          <div>
+            <label for="sexo">Sexo</label>
+            <select id="sexo">
+              <option value="F">Femenino</option>
+              <option value="M">Masculino</option>
+              <option value="Otro">Otro / Prefiero no decir</option>
+            </select>
+          </div>
+          <div>
+            <label for="nivel">Nivel en gym</label>
+            <select id="nivel">
+              <option>principiante</option>
+              <option>intermedio</option>
+              <option>avanzado</option>
+            </select>
+          </div>
+        </div>
+        <div class="grid g2">
+          <div>
+            <label for="altura">Altura (cm)</label>
+            <input id="altura" type="number" step="1" placeholder="160" />
+          </div>
+          <div>
+            <label for="peso">Peso (kg)</label>
+            <input id="peso" type="number" step="0.1" placeholder="64.5" />
+          </div>
+        </div>
+        <div class="grid g2">
+          <div>
+            <label for="lesiones">¿Tienes lesiones? ¿Cuáles?</label>
+            <input id="lesiones" placeholder="Rodilla derecha (ligera)" />
+          </div>
+          <div>
+            <label for="enfermedades">¿Enfermedades? ¿Cuáles?</label>
+            <input id="enfermedades" placeholder="Asma leve…" />
+          </div>
+        </div>
+      </section>
+
+      <!-- YA REGISTRADO: check-in diario -->
+      <section id="sec-existing" style="display:none">
+        <div class="sep"></div>
+        <div class="grid g3">
+          <div>
+            <label for="sentir">¿Cómo te sientes hoy?</label>
+            <input id="sentir" placeholder="Con energía media" />
+          </div>
+          <div>
+            <label for="musculo">¿Qué músculo te toca hoy?</label>
+            <input id="musculo" placeholder="Glúteo y femoral" />
+          </div>
+          <div>
+            <label for="minutos">¿Cuántos minutos quieres entrenar?</label>
+            <input id="minutos" type="number" min="20" max="180" step="5" placeholder="60" />
+          </div>
+        </div>
+      </section>
+
+      <div class="sep"></div>
+      <div class="row">
+        <button class="btn" id="btnSend">🚀 Enviar a n8n</button>
+        <button class="btn ghost" id="btnSave" type="button">💾 Recordar usuario</button>
+      </div>
+      <div id="estado" class="hint" style="margin-top:10px"></div>
+      <pre id="resultado" class="result"></pre>
+    </div>
+
+    <div id="dbg" class="debug">
+      <button id="t-run">🧪 Tests</button>
+      <button id="t-preflight">📡 Preflight</button>
+      <pre id="t-out"></pre>
+    </div>
+  </div>
+
+<script>
+  // === CONFIG ===
+  // ⚠️ Reemplaza con tu Production URL de n8n Cloud (https):
+  // const WEBHOOK_URL = "https://TU-SUBDOMINIO.n8n.cloud/webhook/gym/login-register";
+  const WEBHOOK_URL = "https://TU-N8N/webhook/gym/login-register"; // ← cámbiame
+
+  // === HELPERS ===
+  const $ = (id)=>document.getElementById(id);
+  const show = (el)=>el.style.display='block';
+  const hide = (el)=>el.style.display='none';
+
+  function isValidWebhookUrl(u){
+    try{
+      const url = new URL(u);
+      if(/TU-N8N/i.test(u)) return {ok:false, reason:'Placeholder sin reemplazar'};
+      if(url.protocol!=='https:') return {ok:false, reason:'La URL debe ser HTTPS'};
+      if(!/\/webhook\//.test(url.pathname)) return {ok:false, reason:'La ruta no parece /webhook/...'};
+      return {ok:true};
+    }catch{ return {ok:false, reason:'URL inválida'} }
+  }
+
+  function buildRegisterPayload(){
+    return {
+      mode: 'register',
+      username: $('username').value.trim(),
+      password: $('password').value,
+      nombre: $('nombre').value.trim(),
+      apellido: $('apellido').value.trim(),
+      edad: Number($('edad').value||0),
+      sexo: $('sexo').value,
+      altura_cm: Number($('altura').value||0),
+      peso_kg: Number($('peso').value||0),
+      nivel: $('nivel').value,
+      lesiones: $('lesiones').value.trim(),
+      enfermedades: $('enfermedades').value.trim(),
+      timestamp: new Date().toISOString()
+    };
+  }
+
+  function buildCheckinPayload(){
+    return {
+      mode: 'checkin',
+      username: $('username').value.trim(),
+      password: $('password').value,
+      como_se_siente: $('sentir').value.trim(),
+      musculo_hoy: $('musculo').value.trim(),
+      minutos_rutina: Number($('minutos').value||60),
+      timestamp: new Date().toISOString()
+    };
+  }
+
+  async function postJSON(url, data){
+    const controller = new AbortController();
+    const timeout = setTimeout(()=>controller.abort(), 15000);
+    try{
+      const res = await fetch(url,{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(data),
+        signal: controller.signal,
+        mode: 'cors',
+        cache: 'no-store'
+      });
+      clearTimeout(timeout);
+      if(!res.ok){
+        const txt = await res.text().catch(()=>'​');
+        throw new Error(`${res.status} ${res.statusText} ${txt}`.trim());
+      }
+      return await res.json().catch(()=>({ok:true}));
+    }catch(err){ throw err; }
+  }
+
+  // === UI Logic ===
+  const tabNew = $('tab-new');
+  const tabExisting = $('tab-existing');
+  const secNew = $('sec-new');
+  const secExisting = $('sec-existing');
+
+  tabNew.addEventListener('click',()=>{
+    tabNew.classList.add('active'); tabExisting.classList.remove('active');
+    secNew.style.display='block'; secExisting.style.display='none';
+  });
+  tabExisting.addEventListener('click',()=>{
+    tabExisting.classList.add('active'); tabNew.classList.remove('active');
+    secExisting.style.display='block'; secNew.style.display='none';
+  });
+
+  $('btnSave').addEventListener('click',()=>{
+    const u = $('username').value.trim();
+    if(u){ localStorage.setItem('gym_user',u); $('estado').textContent='✅ Usuario guardado en este navegador'; setTimeout(()=>$('estado').textContent='',2000); }
+  });
+
+  $('btnSend').addEventListener('click', async ()=>{
+    $('resultado').style.display='none';
+    const urlCheck = isValidWebhookUrl(WEBHOOK_URL);
+    if(!urlCheck.ok){ $('estado').innerHTML = `❌ WEBHOOK_URL inválida: ${urlCheck.reason}`; return; }
+
+    const isNew = tabNew.classList.contains('active');
+
+    // Validaciones mínimas
+    const user = $('username').value.trim();
+    const pass = $('password').value;
+    if(!user || !pass){ $('estado').textContent='❌ Usuario y contraseña son obligatorios'; return; }
+
+    let payload;
+    if(isNew){
+      // Campos obligatorios para registro
+      const required = ['nombre','apellido','edad','sexo','altura','peso','nivel'];
+      for(const id of required){ if(!$(id).value){ $('estado').textContent='❌ Completa todos los datos de registro'; return; } }
+      payload = buildRegisterPayload();
+    } else {
+      // Campos obligatorios para check-in
+      const required = ['sentir','musculo','minutos'];
+      for(const id of required){ if(!$(id).value){ $('estado').textContent='❌ Completa el check-in de hoy'; return; } }
+      payload = buildCheckinPayload();
+    }
+
+    $('estado').textContent='⏳ Enviando…';
+    try{
+      const data = await postJSON(WEBHOOK_URL, payload);
+      $('estado').textContent='✅ Enviado';
+      $('resultado').textContent = 'Respuesta de n8n:\n' + JSON.stringify(data,null,2);
+      $('resultado').style.display='block';
+      localStorage.setItem('gym_user', user);
+    }catch(err){
+      $('estado').innerHTML = `❌ Error: ${err?.message||err}`;
+    }
+  });
+
+  // INIT
+  window.addEventListener('load',()=>{
+    const saved = localStorage.getItem('gym_user'); if(saved) $('username').value = saved;
+    const params = new URLSearchParams(location.search);
+    if(params.get('debug')==='1'){ document.getElementById('dbg').style.display='block'; }
+    $('t-run')?.addEventListener('click',()=>{
+      const r = isValidWebhookUrl(WEBHOOK_URL);
+      const out = [ 'URL válida: ' + (r.ok ? 'OK' : 'FALLA → '+r.reason) ];
+      const p1 = buildRegisterPayload();
+      const p2 = buildCheckinPayload();
+      out.push('Payload register tiene username y password: ' + (!!p1.username && !!p1.password));
+      out.push('Payload checkin tiene username y password: ' + (!!p2.username && !!p2.password));
+      $('t-out').textContent = out.join('\n');
+    });
+    $('t-preflight')?.addEventListener('click', async()=>{
+      try{ const r = await fetch(WEBHOOK_URL,{method:'OPTIONS',mode:'cors'}); $('t-out').textContent = 'Preflight status: '+r.status; }
+      catch(e){ $('t-out').textContent = 'Preflight error: '+e; }
+    });
+  });
+</script>
+</body>
+</html>
