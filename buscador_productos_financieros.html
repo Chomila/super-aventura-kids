@@ -388,20 +388,32 @@ async function fetchPageContent(url) {
 function htmlToText(html) {
   const tmp = document.createElement('div');
   tmp.innerHTML = html;
-  // Remove scripts, styles, nav, footer noise
+
+  // Extract inline script text that might contain CAT/GAT/rate values before removing scripts
+  let scriptData = '';
+  tmp.querySelectorAll('script:not([src])').forEach(s => {
+    const t = s.textContent || '';
+    // Only keep scripts that mention financial terms
+    if (/CAT|GAT|tasa|interés|anual|porcentaje|\d+\.\d+%/i.test(t)) {
+      scriptData += '\n[DATOS JS]: ' + t.replace(/[{}()=;]/g, ' ').replace(/\s+/g, ' ').slice(0, 500);
+    }
+  });
+
+  // Remove noise
   tmp.querySelectorAll('script,style,noscript,iframe,svg,img,nav,footer,aside').forEach(n => n.remove());
-  // Preserve some structure
+
+  // Preserve structure
   tmp.querySelectorAll('h1,h2,h3,h4,h5,h6').forEach(h => {
     h.textContent = '\n## ' + h.textContent.trim() + '\n';
   });
   tmp.querySelectorAll('li').forEach(li => {
     li.textContent = '\n- ' + li.textContent.trim();
   });
-  let text = tmp.textContent || tmp.innerText || '';
-  // Collapse excessive whitespace
-  text = text.replace(/\n{3,}/g, '\n\n').replace(/ {2,}/g, ' ').trim();
-  // Limit to ~12000 chars to stay within token budget
-  return text.slice(0, 12000);
+
+  let text = (tmp.textContent || tmp.innerText || '').replace(/\n{3,}/g, '\n\n').replace(/ {2,}/g, ' ').trim();
+  // Append any JS financial data
+  if (scriptData) text += '\n\n' + scriptData;
+  return text.slice(0, 13000);
 }
 
 // ──────────────────────────────────────────────
@@ -428,12 +440,16 @@ Para CADA producto encontrado devuelve un objeto JSON con esta estructura exacta
   "otros_datos": "cualquier otro dato relevante como comisiones, requisitos, etc."
 }
 
-Reglas:
-- CAT (Costo Anual Total) aplica a productos de crédito: tarjetas de crédito, préstamos, hipotecas, créditos personales, automotrices, etc.
-- GAT (Ganancia Anual Total) aplica a productos de inversión y ahorro: CETES, pagarés, fondos de inversión, cuentas de ahorro, etc.
-- Incluye la leyenda legal EXACTA del CAT o GAT si aparece en el texto (suele ser texto en letra pequeña).
-- Si hay varios productos del mismo tipo con diferentes variantes, inclúyelos como productos separados.
-- Si no encuentras ningún producto financiero claro, devuelve un array vacío.
+Reglas CRÍTICAS:
+- CAT (Costo Anual Total) SOLO aplica a créditos: tarjetas de crédito, préstamos, hipotecas, créditos personales/automotrices. NUNCA pongas CAT en productos de inversión.
+- GAT (Ganancia Anual Total) SOLO aplica a inversión/ahorro: cuentas de ahorro, CETES, pagarés, fondos. NUNCA pongas GAT en créditos.
+- Busca valores de CAT/GAT en TODO el texto, incluyendo secciones de "Costos y comisiones", "Tasas", texto pequeño legal, o secciones con porcentajes como "XX% sin IVA".
+- Si ves "CAT promedio XX% sin IVA" en la página, úsalo para TODOS los productos de crédito de esa institución.
+- Si ves "GAT Nominal XX%" o "GAT Real XX%" en la página, úsalo para los productos de inversión.
+- Cuando un valor NO está disponible en el texto, usa JSON null (no el string "null").
+- Incluye la leyenda legal EXACTA del CAT o GAT si aparece (texto en letra pequeña con fecha de cálculo, monto de referencia, etc).
+- Si hay variantes del mismo producto (ej: clásica, oro, platino), inclúyelos separados.
+- Si no encuentras ningún producto financiero claro, devuelve array vacío.
 
 Responde ÚNICAMENTE con un objeto JSON válido con esta estructura:
 {
@@ -507,28 +523,44 @@ function renderProductos(productos) {
 
   empty.style.display = 'none';
 
+  // Normalize: treat string "null" / "undefined" / "" as null
+  function val(v) { return (!v || v === 'null' || v === 'undefined' || v === 'N/A') ? null : v; }
+
   productos.forEach(p => {
     const card = document.createElement('div');
     card.className = 'product-card';
     card.dataset.tipo = p.tipo;
 
+    const cat      = val(p.cat);
+    const gat      = val(p.gat);
+    const tasa     = val(p.tasa);
+    const plazo    = val(p.plazo);
+    const montoMin = val(p.monto_min);
+    const otros    = val(p.otros_datos);
+    const catLey   = val(p.cat_leyenda);
+    const gatLey   = val(p.gat_leyenda);
+    const esCredito   = p.tipo === 'credito';
+    const esInversion = p.tipo === 'inversion';
+
     let rateHTML = '';
-    if (p.cat) {
+    // CAT solo para créditos
+    if (cat && (esCredito || (!esInversion && !cat?.toLowerCase?.().includes('gat')))) {
       rateHTML += `<div class="rate-badge cat">
         <span class="label">CAT</span>
-        <span class="value">${p.cat}</span>
+        <span class="value">${cat}</span>
       </div>`;
     }
-    if (p.gat) {
+    // GAT solo para inversión/ahorro
+    if (gat && (esInversion || (!esCredito))) {
       rateHTML += `<div class="rate-badge gat">
         <span class="label">GAT Nominal</span>
-        <span class="value">${p.gat}</span>
+        <span class="value">${gat}</span>
       </div>`;
     }
-    if (p.tasa && !p.cat && !p.gat) {
+    if (tasa && !cat && !gat) {
       rateHTML += `<div class="rate-badge" style="background:#f3e5f5;color:#6a1b9a;">
         <span class="label">Tasa</span>
-        <span class="value">${p.tasa}</span>
+        <span class="value">${tasa}</span>
       </div>`;
     }
 
@@ -537,16 +569,16 @@ function renderProductos(productos) {
       : '';
 
     let extraHTML = '';
-    if (p.plazo)      extraHTML += `<div class="features-list"><ul><li>Plazo: ${p.plazo}</li></ul></div>`;
-    if (p.monto_min)  extraHTML += `<div class="features-list"><ul><li>Monto mínimo: ${p.monto_min}</li></ul></div>`;
-    if (p.otros_datos) extraHTML += `<p class="product-desc" style="font-size:.78rem;">${p.otros_datos}</p>`;
+    if (plazo)    extraHTML += `<div class="features-list"><ul><li>Plazo: ${plazo}</li></ul></div>`;
+    if (montoMin) extraHTML += `<div class="features-list"><ul><li>Monto mínimo: ${montoMin}</li></ul></div>`;
+    if (otros)    extraHTML += `<p class="product-desc" style="font-size:.78rem;">${otros}</p>`;
 
     let legalHTML = '';
-    if (p.cat_leyenda) {
-      legalHTML += `<div class="legal"><strong>Leyenda CAT:</strong> ${p.cat_leyenda}</div>`;
+    if (catLey && esCredito) {
+      legalHTML += `<div class="legal"><strong>Leyenda CAT:</strong> ${catLey}</div>`;
     }
-    if (p.gat_leyenda) {
-      legalHTML += `<div class="legal"><strong>Leyenda GAT:</strong> ${p.gat_leyenda}</div>`;
+    if (gatLey && esInversion) {
+      legalHTML += `<div class="legal"><strong>Leyenda GAT:</strong> ${gatLey}</div>`;
     }
 
     card.innerHTML = `
