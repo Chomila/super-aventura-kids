@@ -290,9 +290,9 @@
 
     <div class="api-row">
       <input type="checkbox" id="useApiKey" onchange="toggleApiKey()" />
-      <label for="useApiKey">Usar mi propia API Key de Claude (Anthropic)</label>
+      <label for="useApiKey">Ingresar mi API Key de OpenAI (ChatGPT)</label>
     </div>
-    <input type="password" id="apiKeyField" placeholder="sk-ant-..." autocomplete="off" />
+    <input type="password" id="apiKeyField" placeholder="sk-..." autocomplete="off" />
   </div>
 
   <!-- Status -->
@@ -359,15 +359,15 @@ function getApiKey() {
   const useOwn = document.getElementById('useApiKey').checked;
   if (useOwn) {
     const k = document.getElementById('apiKeyField').value.trim();
-    if (!k) throw new Error('Por favor ingresa tu API Key de Claude.');
+    if (!k) throw new Error('Por favor ingresa tu API Key de OpenAI.');
     return k;
   }
   // Fallback: prompt once and store in sessionStorage
-  let key = sessionStorage.getItem('claude_api_key');
+  let key = sessionStorage.getItem('openai_api_key');
   if (!key) {
-    key = prompt('Para usar esta app necesitas una API Key de Anthropic (Claude).\n\nIngresa tu API Key (sk-ant-...):\n\nPuedes obtenerla en: console.anthropic.com');
+    key = prompt('Para usar esta app necesitas una API Key de OpenAI (ChatGPT).\n\nIngresa tu API Key (sk-...):\n\nPuedes obtenerla en: platform.openai.com/api-keys');
     if (!key || !key.startsWith('sk-')) throw new Error('API Key inválida o cancelada.');
-    sessionStorage.setItem('claude_api_key', key.trim());
+    sessionStorage.setItem('openai_api_key', key.trim());
   }
   return key.trim();
 }
@@ -444,19 +444,20 @@ Responde ÚNICAMENTE con un objeto JSON válido con esta estructura:
 
   const userMsg = `Analiza esta página web y extrae todos los productos financieros.\nURL: ${url}\n\nCONTENIDO DE LA PÁGINA:\n\n${pageText}`;
 
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true'
+      'Authorization': `Bearer ${apiKey}`
     },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-6',
+      model: 'gpt-4o',
       max_tokens: 4096,
-      system: systemPrompt,
-      messages: [{ role: 'user', content: userMsg }]
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userMsg }
+      ],
+      response_format: { type: 'json_object' }
     })
   });
 
@@ -466,7 +467,7 @@ Responde ÚNICAMENTE con un objeto JSON válido con esta estructura:
   }
 
   const data = await response.json();
-  const raw = data.content[0].text.trim();
+  const raw = data.choices[0].message.content.trim();
 
   // Extract JSON from response (handle markdown code blocks)
   const jsonMatch = raw.match(/```(?:json)?\s*([\s\S]*?)```/) || [null, raw];
