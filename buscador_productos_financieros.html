@@ -376,11 +376,29 @@ function getApiKey() {
 //  Fetch page via CORS proxy
 // ──────────────────────────────────────────────
 async function fetchOneUrl(url) {
-  const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
-  const res = await fetch(proxyUrl);
-  if (!res.ok) return '';
-  const data = await res.json();
-  return data.contents || '';
+  // Try multiple CORS proxies in order until one works
+  const proxies = [
+    async (u) => {
+      const r = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(u)}`);
+      if (!r.ok) return '';
+      const d = await r.json(); return d.contents || '';
+    },
+    async (u) => {
+      const r = await fetch(`https://corsproxy.io/?${encodeURIComponent(u)}`);
+      if (!r.ok) return ''; return await r.text();
+    },
+    async (u) => {
+      const r = await fetch(`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`);
+      if (!r.ok) return ''; return await r.text();
+    }
+  ];
+  for (const proxy of proxies) {
+    try {
+      const content = await proxy(url);
+      if (content && content.length > 200) return content;
+    } catch(e) {}
+  }
+  return '';
 }
 
 // Extract product sub-page links from HTML (tarjeta, credito, prestamo, inversion, ahorro, seguro)
