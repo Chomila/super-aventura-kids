@@ -246,12 +246,26 @@
     /* Legal legend */
     .legal {
       font-size: 0.7rem;
-      color: #888;
+      color: #555;
       border-top: 1px solid #eee;
       padding-top: 8px;
       line-height: 1.5;
       font-style: italic;
     }
+    /* Missing CAT/GAT alert */
+    .rate-missing {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: #fff8e1;
+      border: 1px solid #ffe082;
+      border-radius: 8px;
+      padding: 7px 12px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: #e65100;
+    }
+    .rate-missing svg { flex-shrink: 0; }
 
     /* ── Empty state ── */
     #empty {
@@ -490,45 +504,45 @@ function htmlToText(html) {
 //  Claude API call
 // ──────────────────────────────────────────────
 async function analyzeWithClaude(pageText, url, apiKey) {
-  const systemPrompt = `Eres un experto en productos financieros mexicanos.
-Tu tarea es analizar el contenido de texto de una página web de una institución financiera
-y extraer la lista de productos financieros que ofrece.
+  const systemPrompt = `Eres un especialista en cumplimiento regulatorio de productos financieros mexicanos.
 
-Para CADA producto encontrado devuelve un objeto JSON con esta estructura exacta:
+Tu tarea principal es BUSCAR Y DOCUMENTAR el CAT o GAT que la institución financiera publica en su página web, junto con su leyenda legal exacta. NUNCA calcules ni estimes estos valores — solo transcribe lo que está escrito en la página.
+
+Para CADA producto encontrado devuelve este JSON:
 {
-  "nombre": "Nombre del producto",
+  "nombre": "Nombre exacto del producto",
   "tipo": "credito" | "inversion" | "seguro" | "otro",
-  "descripcion": "Resumen breve (2-3 oraciones) de las características principales",
-  "caracteristicas": ["característica 1", "característica 2", ...],
-  "cat": "valor porcentual o null si no aplica",
-  "cat_leyenda": "Leyenda legal del CAT tal como aparece en la página, o null",
-  "gat": "valor porcentual o null si no aplica",
-  "gat_leyenda": "Leyenda legal del GAT tal como aparece en la página, o null",
-  "tasa": "tasa de interés si aplica, o null",
-  "plazo": "plazo si aplica, o null",
-  "monto_min": "monto mínimo si aplica, o null",
-  "otros_datos": "cualquier otro dato relevante como comisiones, requisitos, etc."
+  "descripcion": "Resumen breve de características (2-3 oraciones)",
+  "caracteristicas": ["característica 1", ...],
+  "cat": "Valor EXACTO tal como aparece en la página (ej: '96.9% sin IVA') o null si NO aparece en la página",
+  "cat_leyenda": "Texto legal COMPLETO y LITERAL del CAT tal como aparece en la página (suele incluir fecha, monto de referencia, vigencia). null si no aparece.",
+  "gat_nominal": "Valor EXACTO del GAT Nominal tal como aparece o null",
+  "gat_real": "Valor EXACTO del GAT Real tal como aparece o null",
+  "gat_leyenda": "Texto legal COMPLETO y LITERAL del GAT tal como aparece en la página. null si no aparece.",
+  "tasa": "Tasa de interés si aparece, o null",
+  "plazo": "Plazo si aparece, o null",
+  "monto_min": "Monto mínimo si aparece, o null",
+  "otros_datos": "Comisiones, requisitos u otros datos relevantes, o null"
 }
 
-Reglas CRÍTICAS:
-- CAT (Costo Anual Total) SOLO aplica a créditos: tarjetas de crédito, préstamos, hipotecas, créditos personales/automotrices. NUNCA pongas CAT en productos de inversión.
-- GAT (Ganancia Anual Total) SOLO aplica a inversión/ahorro: cuentas de ahorro, CETES, pagarés, fondos. NUNCA pongas GAT en créditos.
-- Busca valores de CAT/GAT en TODO el texto, incluyendo secciones de "Costos y comisiones", "Tasas", texto pequeño legal, o secciones con porcentajes como "XX% sin IVA".
-- Si ves "CAT promedio XX% sin IVA" en la página, úsalo para TODOS los productos de crédito de esa institución.
-- Si ves "GAT Nominal XX%" o "GAT Real XX%" en la página, úsalo para los productos de inversión.
-- Cuando un valor NO está disponible en el texto, usa JSON null (no el string "null").
-- Incluye la leyenda legal EXACTA del CAT o GAT si aparece (texto en letra pequeña con fecha de cálculo, monto de referencia, etc).
-- Si hay variantes del mismo producto (ej: clásica, oro, platino), inclúyelos separados.
-- Si no encuentras ningún producto financiero claro, devuelve array vacío.
+REGLAS ABSOLUTAS:
+1. CAT (Costo Anual Total): SOLO para créditos/tarjetas/préstamos/hipotecas. JAMÁS para inversión.
+2. GAT (Ganancia Anual Total): SOLO para inversión/ahorro/CETES/pagarés/fondos. JAMÁS para crédito.
+3. COPIA TEXTUAL: el valor de cat, cat_leyenda, gat_nominal, gat_real y gat_leyenda debe ser EXACTAMENTE como aparece en la página, sin modificar ni resumir.
+4. Si el mismo CAT/GAT aplica a toda la institución (no a un producto específico), asígnalo a todos los productos del tipo correspondiente.
+5. Busca el CAT/GAT en TODAS partes: sección "Costos y comisiones", notas al pie, texto en letra pequeña, texto después de porcentajes como "XX% sin IVA", secciones con asteriscos (*).
+6. Si el producto DEBERÍA tener CAT (es crédito) pero NO aparece en la página → usa null (el sistema alertará al usuario).
+7. Si el producto DEBERÍA tener GAT (es inversión) pero NO aparece en la página → usa null (el sistema alertará al usuario).
+8. Usa JSON null (nunca el string "null") cuando un dato no está en la página.
 
-Responde ÚNICAMENTE con un objeto JSON válido con esta estructura:
+Responde ÚNICAMENTE con JSON válido:
 {
-  "institucion": "Nombre de la institución financiera",
-  "resumen": "Breve descripción de la institución y sus productos (1-2 oraciones)",
-  "productos": [ ...array de productos... ]
+  "institucion": "Nombre de la institución",
+  "resumen": "Descripción breve (1-2 oraciones)",
+  "productos": [ ...array... ]
 }`;
 
-  const userMsg = `Analiza esta página web y extrae todos los productos financieros.\nURL: ${url}\n\nCONTENIDO DE LA PÁGINA:\n\n${pageText}`;
+  const userMsg = `Busca y documenta los productos financieros y sus CAT/GAT publicados en esta página.\nURL: ${url}\n\nCONTENIDO:\n\n${pageText}`;
 
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
@@ -601,37 +615,43 @@ function renderProductos(productos) {
     card.className = 'product-card';
     card.dataset.tipo = p.tipo;
 
-    const cat      = val(p.cat);
-    const gat      = val(p.gat);
-    const tasa     = val(p.tasa);
-    const plazo    = val(p.plazo);
-    const montoMin = val(p.monto_min);
-    const otros    = val(p.otros_datos);
-    const catLey   = val(p.cat_leyenda);
-    const gatLey   = val(p.gat_leyenda);
-    const esCredito   = p.tipo === 'credito';
-    const esInversion = p.tipo === 'inversion';
+    const cat        = val(p.cat);
+    const gatNominal = val(p.gat_nominal || p.gat);
+    const gatReal    = val(p.gat_real);
+    const tasa       = val(p.tasa);
+    const plazo      = val(p.plazo);
+    const montoMin   = val(p.monto_min);
+    const otros      = val(p.otros_datos);
+    const catLey     = val(p.cat_leyenda);
+    const gatLey     = val(p.gat_leyenda);
+    const esCred  = p.tipo === 'credito';
+    const esInv   = p.tipo === 'inversion';
+
+    const alertIcon = `<svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>`;
 
     let rateHTML = '';
-    // CAT solo para créditos
-    if (cat && (esCredito || (!esInversion && !cat?.toLowerCase?.().includes('gat')))) {
-      rateHTML += `<div class="rate-badge cat">
-        <span class="label">CAT</span>
-        <span class="value">${cat}</span>
-      </div>`;
+
+    if (esCred) {
+      if (cat) {
+        rateHTML += `<div class="rate-badge cat"><span class="label">CAT</span><span class="value">${cat}</span></div>`;
+      } else {
+        rateHTML += `<div class="rate-missing">${alertIcon} CAT no publicado en esta página</div>`;
+      }
     }
-    // GAT solo para inversión/ahorro
-    if (gat && (esInversion || (!esCredito))) {
-      rateHTML += `<div class="rate-badge gat">
-        <span class="label">GAT Nominal</span>
-        <span class="value">${gat}</span>
-      </div>`;
+
+    if (esInv) {
+      if (gatNominal) {
+        rateHTML += `<div class="rate-badge gat"><span class="label">GAT Nominal</span><span class="value">${gatNominal}</span></div>`;
+      } else {
+        rateHTML += `<div class="rate-missing">${alertIcon} GAT no publicado en esta página</div>`;
+      }
+      if (gatReal) {
+        rateHTML += `<div class="rate-badge gat" style="background:#e8f5e9;color:#1b5e20;"><span class="label">GAT Real</span><span class="value">${gatReal}</span></div>`;
+      }
     }
-    if (tasa && !cat && !gat) {
-      rateHTML += `<div class="rate-badge" style="background:#f3e5f5;color:#6a1b9a;">
-        <span class="label">Tasa</span>
-        <span class="value">${tasa}</span>
-      </div>`;
+
+    if (!esCred && !esInv && tasa) {
+      rateHTML += `<div class="rate-badge" style="background:#f3e5f5;color:#6a1b9a;"><span class="label">Tasa</span><span class="value">${tasa}</span></div>`;
     }
 
     const featuresHTML = p.caracteristicas?.length
@@ -644,20 +664,18 @@ function renderProductos(productos) {
     if (otros)    extraHTML += `<p class="product-desc" style="font-size:.78rem;">${otros}</p>`;
 
     let legalHTML = '';
-    if (catLey && esCredito) {
-      legalHTML += `<div class="legal"><strong>Leyenda CAT:</strong> ${catLey}</div>`;
+    if (catLey && esCred) {
+      legalHTML += `<div class="legal"><strong>Leyenda CAT:</strong><br>${catLey}</div>`;
     }
-    if (gatLey && esInversion) {
-      legalHTML += `<div class="legal"><strong>Leyenda GAT:</strong> ${gatLey}</div>`;
+    if (gatLey && esInv) {
+      legalHTML += `<div class="legal"><strong>Leyenda GAT:</strong><br>${gatLey}</div>`;
     }
 
     card.innerHTML = `
-      <div>
-        <span class="product-type ${tipoBadgeClass(p.tipo)}">${tipoLabel(p.tipo)}</span>
-      </div>
+      <div><span class="product-type ${tipoBadgeClass(p.tipo)}">${tipoLabel(p.tipo)}</span></div>
       <div class="product-name">${p.nombre}</div>
       ${p.descripcion ? `<div class="product-desc">${p.descripcion}</div>` : ''}
-      ${rateHTML ? `<div class="rate-badges">${rateHTML}</div>` : ''}
+      ${rateHTML ? `<div class="rate-badges" style="flex-direction:column;">${rateHTML}</div>` : ''}
       ${featuresHTML}
       ${extraHTML}
       ${legalHTML}
