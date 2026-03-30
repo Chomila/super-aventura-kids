@@ -474,14 +474,14 @@ async function fetchPageContent(url, onProgress) {
         if (r.status === 'fulfilled' && r.value) {
           const sub = htmlToText(r.value);
           if (sub.length > 100)
-            combined += `\n\n=== ${batch[j]} ===\n` + sub.slice(0, 2000);
+            combined += `\n\n=== ${batch[j]} ===\n` + sub.slice(0, 3500);
         }
       });
-      if (combined.length > 30000) break;
+      if (combined.length > 45000) break;
     }
   }
 
-  return combined.slice(0, 32000);
+  return combined.slice(0, 48000);
 }
 
 async function discoverFromSitemap(origin) {
@@ -530,6 +530,25 @@ async function discoverFromSitemap(origin) {
 
       if (links.size > 0) break; // found something, stop trying other sitemaps
     } catch(e) {}
+  }
+
+  // If sitemap found nothing, try probing common financial product paths
+  if (links.size === 0) {
+    const commonPaths = [
+      '/tarjetas-de-credito', '/tarjeta-de-credito', '/tarjetas', '/credito',
+      '/prestamos', '/préstamos', '/creditos-personales', '/prestamo-personal',
+      '/inversiones', '/ahorro', '/cuentas', '/pagares', '/cetes',
+      '/seguros', '/hipoteca', '/productos', '/productos-financieros',
+      '/banca-personal', '/personas', '/particulares'
+    ];
+    const probeTasks = commonPaths.map(async path => {
+      const u = origin + path;
+      try {
+        const r = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(u)}`, { signal: AbortSignal.timeout(4000) });
+        if (r.ok) { const d = await r.json(); if (d.contents && d.contents.length > 500) links.add(u); }
+      } catch(e) {}
+    });
+    await Promise.allSettled(probeTasks);
   }
 
   return [...links].slice(0, 25);
