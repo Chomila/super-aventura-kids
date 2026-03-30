@@ -415,28 +415,34 @@ async function fetchOneUrl(url) {
   return '';
 }
 
-// Extract product sub-page links from HTML (tarjeta, credito, prestamo, inversion, ahorro, seguro)
+// Extract ALL internal product sub-page links from HTML
 function extractProductLinks(html, baseUrl) {
   const tmp = document.createElement('div');
   tmp.innerHTML = html;
   const base = new URL(baseUrl);
-  const keywords = /tarjeta|credito|crédito|prestamo|préstamo|inversion|inversión|ahorro|seguro|hipoteca|personal|automotri|pagaré|pagare|fondo|cete/i;
-  const seen = new Set();
+  const finKeywords = /tarjeta|credito|cr[eé]dito|prestamo|pr[eé]stamo|inversion|inversi[oó]n|ahorro|seguro|hipoteca|personal|automotri|pagar[eé]|fondo|cete|cuenta|n[oó]mina|digital|cl[ií]c|sorteo|contigo|protec/i;
+  const skipKeywords = /login|logout|register|contact|ayuda|help|blog|noticia|promo|sucursal|locali|app|descarga|facebook|twitter|instagram|youtube|linkedin/i;
+  const seen = new Set([baseUrl]);
   const links = [];
   tmp.querySelectorAll('a[href]').forEach(a => {
     try {
       const href = a.getAttribute('href');
-      if (!href || href.startsWith('#') || href.startsWith('mailto') || href.startsWith('tel')) return;
+      if (!href || /^(#|mailto:|tel:|javascript:)/.test(href)) return;
       const absolute = new URL(href, base).href;
-      // Same domain only, must match financial keywords
-      if (new URL(absolute).hostname !== base.hostname) return;
-      if (!keywords.test(absolute) && !keywords.test(a.textContent)) return;
+      const absUrl = new URL(absolute);
+      if (absUrl.hostname !== base.hostname) return;
+      if (skipKeywords.test(absolute)) return;
+      // Must look like a product page: matches financial keyword in URL or link text
+      const linkText = a.textContent.trim();
+      if (!finKeywords.test(absolute) && !finKeywords.test(linkText)) return;
       if (seen.has(absolute)) return;
       seen.add(absolute);
-      links.push(absolute);
+      links.push({ url: absolute, text: linkText });
     } catch(e) {}
   });
-  return links.slice(0, 6); // max 6 sub-pages
+  // Prioritize links whose text clearly names a product
+  links.sort((a, b) => (b.text.length > 3 ? 1 : 0) - (a.text.length > 3 ? 1 : 0));
+  return links.slice(0, 20).map(l => l.url); // up to 20 sub-pages
 }
 
 async function fetchPageContent(url, onProgress) {
@@ -452,20 +458,24 @@ async function fetchPageContent(url, onProgress) {
   let combinedText = htmlToText(mainHtml);
 
   if (subLinks.length > 0) {
-    onProgress(`Buscando CAT/GAT en ${subLinks.length} página(s) de productos...`);
-    const subResults = await Promise.allSettled(subLinks.map(l => fetchOneUrl(l)));
-    subResults.forEach((r, i) => {
-      if (r.status === 'fulfilled' && r.value) {
-        const sub = htmlToText(r.value);
-        // Only add if it contains rate-related content
-        if (/CAT|GAT|\d+\.?\d*\s*%|tasa|anual/i.test(sub)) {
-          combinedText += `\n\n--- Página producto: ${subLinks[i]} ---\n` + sub.slice(0, 3000);
+    onProgress(`Analizando ${subLinks.length} páginas de productos...`);
+    // Fetch in batches of 5 to avoid overwhelming proxies
+    for (let i = 0; i < subLinks.length; i += 5) {
+      const batch = subLinks.slice(i, i + 5);
+      const results = await Promise.allSettled(batch.map(l => fetchOneUrl(l)));
+      results.forEach((r, j) => {
+        if (r.status === 'fulfilled' && r.value) {
+          const sub = htmlToText(r.value);
+          if (sub.length > 100) {
+            combinedText += `\n\n=== ${batch[j]} ===\n` + sub.slice(0, 2500);
+          }
         }
-      }
-    });
+      });
+      if (combinedText.length > 28000) break; // don't exceed token budget
+    }
   }
 
-  return combinedText.slice(0, 20000);
+  return combinedText.slice(0, 30000);
 }
 
 // Strip HTML to plain text, keeping meaningful structure
@@ -483,8 +493,8 @@ function htmlToText(html) {
     }
   });
 
-  // Remove noise
-  tmp.querySelectorAll('script,style,noscript,iframe,svg,img,nav,footer,aside').forEach(n => n.remove());
+  // Remove noise but KEEP nav (products are listed there)
+  tmp.querySelectorAll('script,style,noscript,iframe,svg,img,footer').forEach(n => n.remove());
 
   // Preserve structure
   tmp.querySelectorAll('h1,h2,h3,h4,h5,h6').forEach(h => {
@@ -504,21 +514,23 @@ function htmlToText(html) {
 //  Claude API call
 // ──────────────────────────────────────────────
 async function analyzeWithClaude(pageText, url, apiKey) {
-  const systemPrompt = `Eres un especialista en cumplimiento regulatorio de productos financieros mexicanos.
+  const systemPrompt = `Eres un especialista en productos financieros mexicanos. Se te proporciona el contenido de MÚLTIPLES páginas web de una institución financiera.
 
-Tu tarea principal es BUSCAR Y DOCUMENTAR el CAT o GAT que la institución financiera publica en su página web, junto con su leyenda legal exacta. NUNCA calcules ni estimes estos valores — solo transcribe lo que está escrito en la página.
+Tu tarea es:
+1. IDENTIFICAR TODOS los productos financieros que ofrece la institución (busca en menús de navegación, listas de productos, páginas de detalle, todo).
+2. Para cada producto, documentar su CAT o GAT EXACTAMENTE como aparece publicado.
 
-Para CADA producto encontrado devuelve este JSON:
+Devuelve UN objeto JSON por cada producto con esta estructura:
 {
   "nombre": "Nombre exacto del producto",
   "tipo": "credito" | "inversion" | "seguro" | "otro",
-  "descripcion": "Resumen breve de características (2-3 oraciones)",
-  "caracteristicas": ["característica 1", ...],
-  "cat": "Valor EXACTO tal como aparece en la página (ej: '96.9% sin IVA') o null si NO aparece en la página",
-  "cat_leyenda": "Texto legal COMPLETO y LITERAL del CAT tal como aparece en la página (suele incluir fecha, monto de referencia, vigencia). null si no aparece.",
-  "gat_nominal": "Valor EXACTO del GAT Nominal tal como aparece o null",
-  "gat_real": "Valor EXACTO del GAT Real tal como aparece o null",
-  "gat_leyenda": "Texto legal COMPLETO y LITERAL del GAT tal como aparece en la página. null si no aparece.",
+  "descripcion": "Resumen breve (2-3 oraciones) de qué es y para qué sirve",
+  "caracteristicas": ["beneficio o característica 1", "beneficio 2", ...],
+  "cat": "Valor LITERAL del CAT como aparece en la página (ej: '96.9% sin IVA') — null si no está publicado",
+  "cat_leyenda": "Texto legal COMPLETO del CAT copiado tal cual de la página — null si no aparece",
+  "gat_nominal": "Valor LITERAL del GAT Nominal — null si no está publicado",
+  "gat_real": "Valor LITERAL del GAT Real — null si no está publicado",
+  "gat_leyenda": "Texto legal COMPLETO del GAT copiado tal cual — null si no aparece",
   "tasa": "Tasa de interés si aparece, o null",
   "plazo": "Plazo si aparece, o null",
   "monto_min": "Monto mínimo si aparece, o null",
@@ -526,20 +538,20 @@ Para CADA producto encontrado devuelve este JSON:
 }
 
 REGLAS ABSOLUTAS:
-1. CAT (Costo Anual Total): SOLO para créditos/tarjetas/préstamos/hipotecas. JAMÁS para inversión.
-2. GAT (Ganancia Anual Total): SOLO para inversión/ahorro/CETES/pagarés/fondos. JAMÁS para crédito.
-3. COPIA TEXTUAL: el valor de cat, cat_leyenda, gat_nominal, gat_real y gat_leyenda debe ser EXACTAMENTE como aparece en la página, sin modificar ni resumir.
-4. Si el mismo CAT/GAT aplica a toda la institución (no a un producto específico), asígnalo a todos los productos del tipo correspondiente.
-5. Busca el CAT/GAT en TODAS partes: sección "Costos y comisiones", notas al pie, texto en letra pequeña, texto después de porcentajes como "XX% sin IVA", secciones con asteriscos (*).
-6. Si el producto DEBERÍA tener CAT (es crédito) pero NO aparece en la página → usa null (el sistema alertará al usuario).
-7. Si el producto DEBERÍA tener GAT (es inversión) pero NO aparece en la página → usa null (el sistema alertará al usuario).
-8. Usa JSON null (nunca el string "null") cuando un dato no está en la página.
+1. INCLUYE TODOS los productos que veas mencionados en menús de navegación, listas, encabezados o páginas — aunque solo tengas el nombre y poca información de algunos.
+2. CAT: SOLO para créditos/tarjetas/préstamos/hipotecas. NUNCA en inversión.
+3. GAT: SOLO para inversión/ahorro/pagarés/CETES/fondos/cuentas de ahorro. NUNCA en crédito.
+4. Los valores de cat, gat_nominal, gat_real y sus leyendas deben copiarse TEXTUALMENTE de la página, sin modificar.
+5. Si el mismo CAT/GAT aplica a toda la institución, asígnalo a TODOS los productos del tipo correspondiente.
+6. Si un crédito/tarjeta no tiene CAT publicado → null. Si una inversión no tiene GAT publicado → null.
+7. NUNCA uses el string "null" — usa JSON null.
+8. Si ves variantes del mismo producto (Clásica, Oro, Platinum, Infinite), inclúyelas como productos separados.
 
 Responde ÚNICAMENTE con JSON válido:
 {
   "institucion": "Nombre de la institución",
-  "resumen": "Descripción breve (1-2 oraciones)",
-  "productos": [ ...array... ]
+  "resumen": "Qué tipo de institución es y qué tipo de productos ofrece (1-2 oraciones)",
+  "productos": [ ...array con TODOS los productos... ]
 }`;
 
   const userMsg = `Busca y documenta los productos financieros y sus CAT/GAT publicados en esta página.\nURL: ${url}\n\nCONTENIDO:\n\n${pageText}`;
@@ -552,7 +564,7 @@ Responde ÚNICAMENTE con JSON válido:
     },
     body: JSON.stringify({
       model: 'gpt-4o',
-      max_tokens: 4096,
+      max_tokens: 8192,
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userMsg }
