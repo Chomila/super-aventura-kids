@@ -284,6 +284,8 @@
       color: #aaa;
     }
   </style>
+  <!-- PDF.js for reading GAT/CAT from PDF documents -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 </head>
 <body>
 
@@ -387,6 +389,56 @@ function getApiKey() {
 }
 
 // ──────────────────────────────────────────────
+//  PDF.js setup
+// ──────────────────────────────────────────────
+if (typeof pdfjsLib !== 'undefined') {
+  pdfjsLib.GlobalWorkerOptions.workerSrc =
+    'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+}
+
+// Fetch a PDF (via corsproxy.io as binary) and extract its text using PDF.js
+async function fetchPdfText(url) {
+  if (typeof pdfjsLib === 'undefined') return '';
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 15000);
+    const resp = await fetch(`https://corsproxy.io/?${encodeURIComponent(url)}`, { signal: ctrl.signal });
+    clearTimeout(t);
+    if (!resp.ok) return '';
+    const buf = await resp.arrayBuffer();
+    if (buf.byteLength < 500) return '';
+    const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+    let text = '';
+    for (let i = 1; i <= Math.min(pdf.numPages, 6); i++) {
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      text += content.items.map(it => it.str).join(' ') + '\n';
+    }
+    return text.trim().slice(0, 7000);
+  } catch(e) { return ''; }
+}
+
+// Find links to PDFs that likely contain rate tables (GAT/CAT/tasas)
+function extractPdfLinks(html, baseUrl) {
+  const tmp = document.createElement('div');
+  tmp.innerHTML = html;
+  const base = new URL(baseUrl);
+  const rateKw = /gat|cat|tasa|inter[eé]s|rendimiento|comisi[oó]n|tabla/i;
+  const pdfs = new Set();
+  tmp.querySelectorAll('a[href]').forEach(a => {
+    const href = a.getAttribute('href') || '';
+    if (!/\.pdf(\?|$)|pdf\.php/i.test(href)) return;
+    const text  = (a.textContent || '').trim();
+    const title = a.getAttribute('title') || '';
+    const nearby = ((a.closest('p,div,li,td,section') || {}).textContent || '').slice(0, 200);
+    if (rateKw.test(text) || rateKw.test(title) || rateKw.test(href) || rateKw.test(nearby)) {
+      try { pdfs.add(new URL(href, base).href); } catch(e) {}
+    }
+  });
+  return [...pdfs].slice(0, 5);
+}
+
+// ──────────────────────────────────────────────
 //  Fetch page via CORS proxy
 // ──────────────────────────────────────────────
 async function fetchOneUrl(url) {
@@ -464,6 +516,8 @@ async function fetchPageContent(url, onProgress) {
   const allLinks = [...new Set([...sitemapUrls, ...htmlLinks])].slice(0, 30);
 
   let combined = htmlToText(mainHtml);
+  // Collect PDF links with rate tables (GAT/CAT) from all pages
+  const allPdfLinks = new Set(extractPdfLinks(mainHtml, url));
 
   if (allLinks.length > 0) {
     onProgress(`Analizando ${allLinks.length} páginas de productos...`);
@@ -475,13 +529,26 @@ async function fetchPageContent(url, onProgress) {
           const sub = htmlToText(r.value);
           if (sub.length > 100)
             combined += `\n\n=== ${batch[j]} ===\n` + sub.slice(0, 3500);
+          // Collect PDF links from sub-pages too
+          extractPdfLinks(r.value, batch[j]).forEach(p => allPdfLinks.add(p));
         }
       });
       if (combined.length > 45000) break;
     }
   }
 
-  return combined.slice(0, 48000);
+  // 5. Fetch PDF documents that contain GAT/CAT rate tables
+  if (allPdfLinks.size > 0) {
+    onProgress(`Leyendo ${allPdfLinks.size} documento(s) PDF con tasas...`);
+    for (const pdfUrl of allPdfLinks) {
+      const pdfText = await fetchPdfText(pdfUrl);
+      if (pdfText && pdfText.length > 100) {
+        combined += `\n\n=== PDF CON TASAS: ${pdfUrl} ===\n` + pdfText;
+      }
+    }
+  }
+
+  return combined.slice(0, 55000);
 }
 
 async function discoverFromSitemap(origin) {
@@ -617,10 +684,11 @@ REGLAS ABSOLUTAS:
 1. INCLUYE TODOS los productos que veas mencionados en menús de navegación, listas, encabezados o páginas — aunque solo tengas el nombre y poca información de algunos.
 2. CAT: SOLO para créditos/tarjetas/préstamos/hipotecas. NUNCA en inversión.
 3. GAT: SOLO para inversión/ahorro/pagarés/CETES/fondos/cuentas de ahorro. NUNCA en crédito.
-4. Los valores de cat, gat_nominal, gat_real y sus leyendas deben copiarse TEXTUALMENTE de la página, sin modificar.
+4. Los valores de cat, gat_nominal, gat_real y sus leyendas deben copiarse TEXTUALMENTE de la página o PDF, sin modificar.
 5. Si el mismo CAT/GAT aplica a toda la institución, asígnalo a TODOS los productos del tipo correspondiente.
 6. Si un crédito/tarjeta no tiene CAT publicado → null. Si una inversión no tiene GAT publicado → null.
 7. NUNCA uses el string "null" — usa JSON null.
+8. Las secciones que dicen "=== PDF CON TASAS: ..." contienen tablas de tasas oficiales — extrae de ahí los GAT/CAT para cada producto.
 8. Si ves variantes del mismo producto (Clásica, Oro, Platinum, Infinite), inclúyelas como productos separados.
 
 Responde ÚNICAMENTE con JSON válido:
